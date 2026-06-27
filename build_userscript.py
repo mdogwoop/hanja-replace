@@ -163,6 +163,97 @@ core_block = """
         { near: /건물|건축|설계|기둥|골격|원자|분자|사회구조/, hanja: '構造' },
       ],
     },
+
+    // ── 同音/詞法消歧擴充(P0)。after 規則匹配緊跟其後的字符 ──
+    '대한': {
+      def: '大韓',
+      rules: [
+        { near: /소한|입춘|절기|이십사절기|24절기|동지|한파/, hanja: '大寒' },
+      ],
+    },
+    '해당': {
+      def: '該當',
+      rules: [
+        { near: /정당해산|당을 해산|해산 결정|정당 해산/, hanja: '解黨' },
+      ],
+    },
+    '무기': {
+      def: '武器',
+      rules: [
+        { near: /무기물|무기화학|무기질|광물|원소|화합물|유기물/, hanja: '無機' },
+      ],
+    },
+    '고려': {
+      def: '考慮',
+      rules: [
+        { after: /^(하|해|했|한|함|돼|되)/, hanja: '考慮' },
+        { near: /왕조|태조|왕건|거란|몽골|개경|고려시대|고려청자|고려대학|만월대|광종/, hanja: '高麗' },
+      ],
+    },
+    '부여': {
+      def: '附與',
+      rules: [
+        { after: /^(하|해|했|받|되|된|됨)/, hanja: '附與' },
+        { near: /백제|사비|부여군|성왕|의자왕|부여읍/, hanja: '扶餘' },
+      ],
+    },
+    '자세': {
+      def: '姿勢',
+      rules: [
+        { after: /^히/, hanja: '仔細' },
+        { near: /교정|허리|척추|앉는|서는|바른자세|운동/, hanja: '姿勢' },
+      ],
+    },
+    '보수': {
+      def: '保守',
+      rules: [
+        { near: /수리|점검|유지보수|보수공사|정비|보수작업/, hanja: '補修' },
+        { near: /임금|급여|대가|연봉|보수를|보수가/, hanja: '報酬' },
+        { near: /진보|좌파|우파|보수정당|보수성향|보수주의|정치/, hanja: '保守' },
+      ],
+    },
+    '인도': {
+      def: '引導',
+      rules: [
+        { after: /^(하|해|했|받)/, hanja: '引導' },
+        { near: /뉴델리|힌두|갠지스|인도양|남아시아|타지마할|인디아/, hanja: '印度' },
+        { near: /인도주의|박애|인도적|난민/, hanja: '人道' },
+        { near: /보행자|횡단보도|보도블록|차도/, hanja: '人道' },
+      ],
+    },
+    '인력': {
+      def: '人力',
+      rules: [
+        { near: /중력|만유인력|뉴턴|천체|질량|끌어당기|물리학/, hanja: '引力' },
+      ],
+    },
+    '위장': {
+      def: '胃腸',
+      rules: [
+        { near: /변장|위장막|위장술|첩보|간첩|위장하|위장한|위장취업/, hanja: '僞裝' },
+        { near: /소화|위장병|장염|위염|소화기|복부|위장약/, hanja: '胃腸' },
+      ],
+    },
+    '주장': {
+      def: '主張',
+      rules: [
+        { near: /야구|축구|농구|배구|역대 주장|완장|선수단|주장직|골키퍼|팀의 주장/, hanja: '主將' },
+      ],
+    },
+    '시청': {
+      def: '視聽',
+      rules: [
+        { near: /시장|구청|행정|민원|청사|시청 앞|시청역|시청앞/, hanja: '市廳' },
+        { near: /영상|방송|드라마|시청률|시청자|채널|생중계|중계|동영상/, hanja: '視聽' },
+      ],
+    },
+    '이상': {
+      def: '以上',
+      rules: [
+        { near: /증상|이상하|이상해|비정상|고장|결함|오류|장애|징후/, hanja: '異常' },
+        { near: /이상향|이상적|이상주의/, hanja: '理想' },
+      ],
+    },
   };
 
   var SKIP_TAGS = new Set([
@@ -261,21 +352,19 @@ core_block = """
   }
 
   // ── Resolve with disambiguation ───────────────────────────────
-  function resolveHanja(hangul, contextText) {
+  function resolveHanja(hangul, contextText, after) {
     var hanja = HANJA_DICT[hangul];
     if (!hanja) return null;
     var d = DISAMBIG[hangul];
-    if (d && contextText) {
-      hanja = d.def;   // curated default unless a context rule matches
+    if (d) {
+      hanja = d.def;   // curated default unless a rule matches
       for (var i = 0; i < d.rules.length; i++) {
-        if (d.rules[i].near.test(contextText)) {
-          hanja = d.rules[i].hanja;
-          break;
-        }
+        var r = d.rules[i];
+        var hit = r.after ? r.after.test(after || '') : r.near.test(contextText || '');
+        if (hit) { hanja = r.hanja; break; }
       }
     }
-    // safety net: identical hanja means nothing to restore — skip it so we
-    // never underline an unchanged word.
+    if (hanja == null) return null;     // 規則判定為不應替換
     if (hanja === hangul) return null;
     return hanja;
   }
@@ -410,7 +499,8 @@ core_block = """
 
     while ((match = PATTERN.exec(text)) !== null) {
       var hangul = match[1];
-      var hanja = resolveHanja(hangul, ctx);
+      var after = text.slice(PATTERN.lastIndex, PATTERN.lastIndex + 3);
+      var hanja = resolveHanja(hangul, ctx, after);
       if (!hanja) continue;
       if (!frag) frag = document.createDocumentFragment();
       if (match.index > lastIndex) {
