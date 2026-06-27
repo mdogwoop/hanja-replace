@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Assembles hanjareplace.user.js from dict.js and converter.js.
+Assembles hanjareplace.user.js from dict.js.
 Output is a self-contained Tampermonkey userscript (v2.0).
+Output is韓國標準漢字（正體）only — no script conversion.
 """
 
 import re, sys, os
@@ -21,15 +22,6 @@ for k, v in pairs:
 dict_lines = [f'  "{k}": "{v}",' for k, v in seen.items()]
 dict_block = '\nvar HANJA_DICT = {\n' + '\n'.join(dict_lines) + '\n};\n'
 
-# ── Read converter maps ──────────────────────────────────────────
-with open(os.path.join(BASE, 'converter.js'), encoding='utf-8') as f:
-    raw_conv = f.read()
-
-# Take everything from the first `var T_TO_S` to EOF — this captures the two
-# maps and the convertScript function verbatim, avoiding brittle brace matching.
-start = raw_conv.index('var T_TO_S')
-conv_block = '\n' + raw_conv[start:].rstrip() + '\n'
-
 # ── Compose userscript ───────────────────────────────────────────
 header = """\
 // ==UserScript==
@@ -38,7 +30,7 @@ header = """\
 // @name:ko      한국어 한자어 복원기
 // @namespace    https://github.com/local/hanja-replace
 // @version      2.0.0
-// @description  Replaces Korean Hangul words with their original Hanja (traditional/simplified/Japanese). Supports ruby annotation, Naver dictionary links, disambiguation, domain whitelist/blacklist.
+// @description  Replaces Korean Hangul words with their original Korean-standard Hanja (正體). Supports ruby annotation, Naver dictionary links, disambiguation, domain whitelist/blacklist.
 // @author       hanja-replace contributors
 // @match        *://*/*
 // @exclude      https://mail.google.com/*
@@ -60,7 +52,6 @@ settings_block = """
 
   var DEFAULT_SETTINGS = {
     enabled:       true,
-    scriptMode:    'traditional',   // 'traditional' | 'simplified' | 'japanese'
     displayMode:   'replace',       // 'replace' | 'ruby'
     showNaverLink: true,
     showBadge:     true,
@@ -275,12 +266,12 @@ core_block = """
     if (d && contextText) {
       for (var i = 0; i < d.rules.length; i++) {
         if (d.rules[i].near.test(contextText)) {
-          return convertScript(d.rules[i].hanja, settings.scriptMode);
+          return d.rules[i].hanja;
         }
       }
-      return convertScript(d.def, settings.scriptMode);
+      return d.def;
     }
-    return convertScript(hanja, settings.scriptMode);
+    return hanja;
   }
 
   // ── Build replacement element ─────────────────────────────────
@@ -423,11 +414,6 @@ core_block = """
     panelEl.innerHTML = [
       '<button class="hj-close" id="hj-panel-close">✕</button>',
       '<h3>韓語漢字詞復原器</h3>',
-      '<label>字形 <select id="hj-script">',
-      '  <option value="traditional">正體</option>',
-      '  <option value="simplified">简体</option>',
-      '  <option value="japanese">新字体</option>',
-      '</select></label>',
       '<label>顯示 <select id="hj-display">',
       '  <option value="replace">替換</option>',
       '  <option value="ruby">注音</option>',
@@ -438,20 +424,12 @@ core_block = """
 
     document.body.appendChild(panelEl);
 
-    panelEl.querySelector('#hj-script').value   = settings.scriptMode;
     panelEl.querySelector('#hj-display').value  = settings.displayMode;
     panelEl.querySelector('#hj-naver').checked  = settings.showNaverLink;
     panelEl.querySelector('#hj-badge').checked  = settings.showBadge;
 
     panelEl.querySelector('#hj-panel-close').addEventListener('click', function () {
       panelEl.remove(); panelEl = null;
-    });
-
-    panelEl.querySelector('#hj-script').addEventListener('change', function (e) {
-      settings.scriptMode = e.target.value;
-      saveSettings(settings);
-      restoreAll();
-      if (isEnabled()) { scheduleScan(document.body); }
     });
 
     panelEl.querySelector('#hj-display').addEventListener('change', function (e) {
@@ -529,10 +507,8 @@ core_block = """
     if (toggleBtn) toggleBtn.classList.toggle('off', !isEnabled());
   });
 
-  GM_registerMenuCommand('韓語漢字 — 字形: ' + settings.scriptMode, function () {
-    var modes = ['traditional', 'simplified', 'japanese'];
-    var idx   = modes.indexOf(settings.scriptMode);
-    settings.scriptMode = modes[(idx + 1) % modes.length];
+  GM_registerMenuCommand('韓語漢字 — 顯示方式切換（替換/注音）', function () {
+    settings.displayMode = settings.displayMode === 'ruby' ? 'replace' : 'ruby';
     saveSettings(settings);
     restoreAll();
     if (isEnabled()) { scheduleScan(document.body); }
@@ -592,7 +568,6 @@ out_path = os.path.join(BASE, 'hanjareplace.user.js')
 with open(out_path, 'w', encoding='utf-8') as f:
     f.write(header)
     f.write(dict_block)
-    f.write(conv_block)
     f.write(settings_block)   # defines `settings`, must precede core_block
     f.write(core_block)
     f.write(footer)

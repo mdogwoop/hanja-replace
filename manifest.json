@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "韓語漢字詞復原器",
   "version": "2.0.0",
-  "description": "将韩语网页中的汉字词（한자어）替换为对应汉字显示，支持简繁切换、注音模式、上下文消歧",
+  "description": "将韩语网页中的汉字词（한자어）替换为韩国标准汉字（正体）显示，支持注音模式、上下文消歧",
   "permissions": ["storage"],
   "host_permissions": ["*://*/*"],
   "background": {
@@ -11,7 +11,7 @@
   "content_scripts": [
     {
       "matches": ["*://*/*"],
-      "js": ["dict.js", "converter.js", "content.js"],
+      "js": ["dict.js", "content.js"],
       "run_at": "document_idle"
     }
   ],

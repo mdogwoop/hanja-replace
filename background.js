@@ -3,7 +3,6 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install') {
     chrome.storage.sync.set({
       enabled: true,
-      scriptMode: 'traditional',  // 'traditional' | 'simplified' | 'japanese'
       displayMode: 'replace',     // 'replace' | 'ruby'
       showBadge: true,
       showNaverLink: true,

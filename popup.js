@@ -2,17 +2,15 @@
 
 const chkEnabled  = document.getElementById('chk-enabled');
 const countVal    = document.getElementById('count-val');
-const scriptRow   = document.getElementById('script-row');
 const displayRow  = document.getElementById('display-row');
 const btnOptions  = document.getElementById('btn-options');
 const btnNaver    = document.getElementById('btn-naver');
 
 // Load current settings and update UI
 chrome.storage.sync.get(
-  { enabled: true, scriptMode: 'traditional', displayMode: 'replace' },
+  { enabled: true, displayMode: 'replace' },
   (s) => {
     chkEnabled.checked = s.enabled;
-    setActive(scriptRow,  '.script-btn',  s.scriptMode);
     setActive(displayRow, '.display-btn', s.displayMode);
   }
 );
@@ -26,15 +24,6 @@ chrome.runtime.sendMessage({ type: 'GET_COUNT' }, (r) => {
 chkEnabled.addEventListener('change', () => {
   const enabled = chkEnabled.checked;
   chrome.storage.sync.set({ enabled }, () => applySettings({ enabled }));
-});
-
-// Script mode buttons
-scriptRow.addEventListener('click', (e) => {
-  const btn = e.target.closest('.script-btn');
-  if (!btn) return;
-  const scriptMode = btn.dataset.mode;
-  setActive(scriptRow, '.script-btn', scriptMode);
-  chrome.storage.sync.set({ scriptMode }, () => applySettings({ scriptMode }));
 });
 
 // Display mode buttons

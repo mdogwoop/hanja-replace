@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
 //  韓語漢字詞復原器  —  content script  v2.0
-//  Depends on: dict.js (HANJA_DICT), converter.js (convertScript)
+//  Depends on: dict.js (HANJA_DICT)
 // ═══════════════════════════════════════════════════════════════
 
-/* global HANJA_DICT, convertScript */
+/* global HANJA_DICT */
 
 (function () {
   'use strict';
@@ -11,7 +11,6 @@
   // ── defaults (overridden by stored settings) ─────────────────
   var settings = {
     enabled: true,
-    scriptMode: 'traditional',   // 'traditional' | 'simplified' | 'japanese'
     displayMode: 'replace',      // 'replace' | 'ruby'
     showBadge: true,
     showNaverLink: true,
@@ -205,13 +204,13 @@
     if (d && contextText) {
       for (var i = 0; i < d.rules.length; i++) {
         if (d.rules[i].near.test(contextText)) {
-          return convertScript(d.rules[i].hanja, settings.scriptMode);
+          return d.rules[i].hanja;
         }
       }
       // no context rule matched → use the curated disambiguation default
-      return convertScript(d.def, settings.scriptMode);
+      return d.def;
     }
-    return convertScript(hanja, settings.scriptMode);
+    return hanja;
   }
 
   // ── build a replaced span or ruby element ─────────────────────
@@ -419,7 +418,7 @@
       sendResponse({ count: totalCount });
     } else if (msg.type === 'APPLY_SETTINGS') {
       // 任一影响渲染的设置变化都需要重绘(字形/显示方式/链接/名单/开关)
-      var RENDER_KEYS = ['enabled', 'scriptMode', 'displayMode', 'showNaverLink', 'whitelist', 'blacklist'];
+      var RENDER_KEYS = ['enabled', 'displayMode', 'showNaverLink', 'whitelist', 'blacklist'];
       var needsReapply = msg.forceReapply || RENDER_KEYS.some(function (k) {
         return k in msg.settings && JSON.stringify(msg.settings[k]) !== JSON.stringify(settings[k]);
       });
@@ -447,7 +446,7 @@
   }
 
   chrome.storage.sync.get(
-    ['enabled', 'scriptMode', 'displayMode', 'showBadge', 'showNaverLink', 'blacklist', 'whitelist'],
+    ['enabled', 'displayMode', 'showBadge', 'showNaverLink', 'blacklist', 'whitelist'],
     function (stored) {
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function () { init(stored); });

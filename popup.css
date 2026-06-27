@@ -75,14 +75,14 @@ body {
 /* ── Section label ── */
 .section-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 
-/* ── Script buttons ── */
-.script-row, .display-row {
+/* ── Display-mode buttons ── */
+.display-row {
   display: flex;
   gap: 6px;
   margin-bottom: 4px;
 }
 
-.script-btn, .display-btn {
+.display-btn {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -98,12 +98,12 @@ body {
   font-family: inherit;
 }
 
-.script-btn:hover, .display-btn:hover {
+.display-btn:hover {
   background: #0f3460;
   border-color: #555;
 }
 
-.script-btn.active, .display-btn.active {
+.display-btn.active {
   background: #0f3460;
   border-color: #e63946;
   color: #fff;

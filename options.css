@@ -124,12 +124,8 @@ h2 {
 /* ── Radio cards ── */
 .radio-group {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.radio-group.two-col {
   grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
 .radio-card {

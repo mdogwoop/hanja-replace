@@ -2,7 +2,6 @@
 
 const DEFAULTS = {
   enabled:      true,
-  scriptMode:   'traditional',
   displayMode:  'replace',
   showBadge:    true,
   showNaverLink: true,
@@ -26,9 +25,6 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
   els.badge.checked   = s.showBadge;
   els.naver.checked   = s.showNaverLink;
 
-  const scriptRadio = document.querySelector(`input[name="scriptMode"][value="${s.scriptMode}"]`);
-  if (scriptRadio) scriptRadio.checked = true;
-
   const displayRadio = document.querySelector(`input[name="displayMode"][value="${s.displayMode}"]`);
   if (displayRadio) displayRadio.checked = true;
 
@@ -38,14 +34,12 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
 
 // Save handler
 els.save.addEventListener('click', () => {
-  const scriptRadio  = document.querySelector('input[name="scriptMode"]:checked');
   const displayRadio = document.querySelector('input[name="displayMode"]:checked');
 
   const settings = {
     enabled:       els.enabled.checked,
     showBadge:     els.badge.checked,
     showNaverLink: els.naver.checked,
-    scriptMode:    scriptRadio  ? scriptRadio.value  : 'traditional',
     displayMode:   displayRadio ? displayRadio.value : 'replace',
     whitelist:     parseList(els.whitelist.value),
     blacklist:     parseList(els.blacklist.value),
