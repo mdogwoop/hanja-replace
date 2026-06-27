@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>韓語漢字詞復原器</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <span class="logo">漢</span>
+    <div class="title-block">
+      <div class="title">韓語漢字詞復原器</div>
+      <div class="subtitle">Korean Hanja Replacer</div>
+    </div>
+    <label class="toggle-wrap" title="啟用／停用">
+      <input type="checkbox" id="chk-enabled">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+    </label>
+  </div>
+
+  <div class="count-row">
+    <span class="count-label">已替換</span>
+    <span id="count-val" class="count-val">—</span>
+    <span class="count-unit">詞</span>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label">輸出字形</div>
+  <div class="script-row" id="script-row">
+    <button class="script-btn" data-mode="traditional">
+      <span class="btn-char">國</span>
+      <span class="btn-label">正體</span>
+    </button>
+    <button class="script-btn" data-mode="simplified">
+      <span class="btn-char">国</span>
+      <span class="btn-label">简体</span>
+    </button>
+    <button class="script-btn" data-mode="japanese">
+      <span class="btn-char">国</span>
+      <span class="btn-label">新字体</span>
+    </button>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-label">顯示方式</div>
+  <div class="display-row" id="display-row">
+    <button class="display-btn" data-mode="replace">
+      <span class="btn-char">漢</span>
+      <span class="btn-label">替換</span>
+    </button>
+    <button class="display-btn" data-mode="ruby">
+      <ruby class="btn-ruby">漢<rt>한</rt></ruby>
+      <span class="btn-label">注音</span>
+    </button>
+  </div>
+
+  <hr class="divider">
+
+  <div class="footer-row">
+    <button id="btn-options" class="link-btn">⚙ 詳細設定</button>
+    <button id="btn-naver" class="link-btn">辭典</button>
+  </div>
+</body>
+<script src="popup.js"></script>
+</html>

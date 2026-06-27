@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>韓語漢字詞復原器 — 詳細設定</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="page-wrap">
+    <header>
+      <span class="logo">漢</span>
+      <div>
+        <h1>韓語漢字詞復原器</h1>
+        <p class="subtitle">Korean Hanja Replacer — 詳細設定</p>
+      </div>
+    </header>
+
+    <main>
+      <!-- General -->
+      <section>
+        <h2>一般</h2>
+        <div class="row">
+          <label class="row-label" for="chk-enabled">啟用擴充功能</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="chk-enabled">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+        <div class="row">
+          <label class="row-label" for="chk-badge">在圖示上顯示替換數量</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="chk-badge">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+        <div class="row">
+          <label class="row-label" for="chk-naver">點擊漢字時開啟 Naver 辭典連結</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="chk-naver">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Script mode -->
+      <section>
+        <h2>輸出字形</h2>
+        <p class="hint">選擇漢字的輸出形式</p>
+        <div class="radio-group">
+          <label class="radio-card">
+            <input type="radio" name="scriptMode" value="traditional">
+            <span class="radio-content">
+              <span class="radio-char">國學語</span>
+              <span class="radio-title">正體中文（繁體）</span>
+              <span class="radio-desc">韓國漢字標準字形，如：國語、學校</span>
+            </span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="scriptMode" value="simplified">
+            <span class="radio-content">
+              <span class="radio-char">国学语</span>
+              <span class="radio-title">簡體中文</span>
+              <span class="radio-desc">中國大陸規範字形，如：国语、学校</span>
+            </span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="scriptMode" value="japanese">
+            <span class="radio-content">
+              <span class="radio-char">国学語</span>
+              <span class="radio-title">日本新字体</span>
+              <span class="radio-desc">日本現代字形，如：国語、学校</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Display mode -->
+      <section>
+        <h2>顯示方式</h2>
+        <div class="radio-group two-col">
+          <label class="radio-card">
+            <input type="radio" name="displayMode" value="replace">
+            <span class="radio-content">
+              <span class="radio-char preview-replace">漢字</span>
+              <span class="radio-title">直接替換</span>
+              <span class="radio-desc">將韓字直接替換為漢字（懸停可見原文）</span>
+            </span>
+          </label>
+          <label class="radio-card">
+            <input type="radio" name="displayMode" value="ruby">
+            <span class="radio-content">
+              <ruby class="radio-char preview-ruby">漢<rt>한</rt></ruby>
+              <span class="radio-title">注音標示</span>
+              <span class="radio-desc">在漢字上方以小字標示韓語原文（振假名樣式）</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Domain lists -->
+      <section>
+        <h2>網域過濾</h2>
+        <p class="hint">白名單優先於黑名單。每行輸入一個網域（如 <code>example.com</code>）。留空表示不限制。</p>
+        <div class="list-grid">
+          <div class="list-block">
+            <label class="list-title" for="whitelist">白名單 <span class="badge badge-green">僅在此執行</span></label>
+            <textarea id="whitelist" rows="6" placeholder="naver.com&#10;daum.net&#10;korea.kr"></textarea>
+          </div>
+          <div class="list-block">
+            <label class="list-title" for="blacklist">黑名單 <span class="badge badge-red">在此停用</span></label>
+            <textarea id="blacklist" rows="6" placeholder="docs.google.com&#10;mail.google.com"></textarea>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div id="status" class="status"></div>
+      <button id="btn-save" class="btn-primary">儲存設定</button>
+    </footer>
+  </div>
+  <script src="options.js"></script>
+</body>
+</html>
