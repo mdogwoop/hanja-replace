@@ -5103,6 +5103,7 @@ var T_TO_S = {
   '鑒': '鉴', '礦': '矿', '盤': '盘', '際': '际',
 };
 
+// Traditional → Japanese Shinjitai (key divergences from above)
 var T_TO_J = {
   '國': '国', '學': '学', '來': '来', '體': '体', '氣': '気',
   '廣': '広', '萬': '万', '歷': '歴', '戰': '戦', '對': '対',
@@ -5129,15 +5130,28 @@ var T_TO_J = {
   '鷄': '鶏', '黑': '黒', '齒': '歯',
 };
 
+/**
+ * Convert a hanja string from Traditional to the requested script.
+ * @param {string} text   — traditional hanja string
+ * @param {string} mode   — 'traditional' | 'simplified' | 'japanese'
+ * @returns {string}
+ */
 function convertScript(text, mode) {
   if (mode === 'traditional') return text;
   var map = mode === 'simplified' ? T_TO_S : T_TO_J;
-  return text.split('').map(function (ch) { return map[ch] || ch; }
+  return text.split('').map(function (ch) { return map[ch] || ch; }).join('');
+}
 
   // ── Build sorted regex from dictionary ───────────────────────
-  var SORTED_KEYS = Object.keys(HANJA_DICT).sort(function (a, b) {
-    return b.length - a.length || a.localeCompare(b);
-  });
+  // 跳过单字词条:在韩文页面里单字(구/금/만…)极高频,会造成海量误替换
+  // 和 DOM 操作,是移动端卡顿的主因。只匹配 2 字以上的词。
+  var MIN_LEN = 2;
+
+  var SORTED_KEYS = Object.keys(HANJA_DICT)
+    .filter(function (k) { return k.length >= MIN_LEN; })
+    .sort(function (a, b) {
+      return b.length - a.length || a.localeCompare(b);
+    });
 
   var PATTERN = new RegExp(
     '(' + SORTED_KEYS.map(function (s) {
@@ -5145,6 +5159,9 @@ function convertScript(text, mode) {
     }).join('|') + ')',
     'g'
   );
+
+  // 快速预筛:节点不含韩文音节时直接跳过昂贵的主正则
+  var HANGUL_RE = /[가-힣]/;
 
   // ── Disambiguation table ──────────────────────────────────────
   var DISAMBIG = {
@@ -5354,8 +5371,18 @@ function convertScript(text, mode) {
     return span;
   }
 
-  // ── Walk and replace text nodes ───────────────────────────────
-  function walkAndReplace(root) {
+  // ── Incremental, idle-time processing ─────────────────────────
+  // 不再一次性遍历整页(大页面会产生几百毫秒的长任务,移动端直接卡死)。
+  // 改为:收集候选文本节点 → 放进队列 → 利用空闲时间分批处理,每批让出主线程。
+  var nodeQueue = [];
+  var draining  = false;
+
+  var idle = window.requestIdleCallback
+    ? window.requestIdleCallback.bind(window)
+    : function (cb) { return setTimeout(function () { cb({ timeRemaining: function () { return 8; } }); }, 16); };
+
+  function collectInto(root) {
+    if (!root || (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE)) return;
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         var p = node.parentElement;
@@ -5365,47 +5392,73 @@ function convertScript(text, mode) {
         if (p.closest('[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
         if (p.hasAttribute(PROCESSED_ATTR)) return NodeFilter.FILTER_REJECT;
         if (p.closest('.hj-span,.hj-ruby')) return NodeFilter.FILTER_REJECT;
+        if (!HANGUL_RE.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       },
     });
+    while (walker.nextNode()) nodeQueue.push(walker.currentNode);
+  }
 
-    var nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
+  function scheduleScan(root) {
+    collectInto(root);
+    kick();
+  }
 
-    for (var ni = 0; ni < nodes.length; ni++) {
-      var textNode = nodes[ni];
-      var text = textNode.nodeValue;
-      if (!PATTERN.test(text)) continue;
-      PATTERN.lastIndex = 0;
+  function kick() {
+    if (draining || nodeQueue.length === 0) return;
+    draining = true;
+    idle(drain);
+  }
 
-      var ctx = (textNode.parentElement && textNode.parentElement.textContent) || text;
-      var frag = document.createDocumentFragment();
-      var lastIndex = 0;
-      var match;
+  function drain(deadline) {
+    var processed = 0;
+    while (nodeQueue.length > 0 &&
+           ((deadline && deadline.timeRemaining() > 4) || processed < 40)) {
+      processNode(nodeQueue.shift());
+      processed++;
+    }
+    draining = false;
+    if (processed > 0) updateBadge();
+    if (nodeQueue.length > 0) kick();
+  }
 
-      while ((match = PATTERN.exec(text)) !== null) {
-        var hangul = match[1];
-        var hanja = resolveHanja(hangul, ctx);
-        if (!hanja) continue;
-        if (match.index > lastIndex) {
-          frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-        }
-        frag.appendChild(makeReplacement(hangul, hanja));
-        totalCount++;
-        lastIndex = PATTERN.lastIndex;
+  function processNode(textNode) {
+    if (!textNode || !textNode.parentNode) return;
+    var p = textNode.parentElement;
+    if (!p || p.hasAttribute(PROCESSED_ATTR)) return;
+
+    var text = textNode.nodeValue;
+    PATTERN.lastIndex = 0;
+
+    var ctx = p.textContent || text;
+    var frag = null;
+    var lastIndex = 0;
+    var match;
+
+    while ((match = PATTERN.exec(text)) !== null) {
+      var hangul = match[1];
+      var hanja = resolveHanja(hangul, ctx);
+      if (!hanja) continue;
+      if (!frag) frag = document.createDocumentFragment();
+      if (match.index > lastIndex) {
+        frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
       }
+      frag.appendChild(makeReplacement(hangul, hanja));
+      totalCount++;
+      lastIndex = PATTERN.lastIndex;
+    }
 
+    if (frag) {
       if (lastIndex < text.length) {
         frag.appendChild(document.createTextNode(text.slice(lastIndex)));
       }
-      if (lastIndex > 0) {
-        textNode.parentNode.replaceChild(frag, textNode);
-      }
+      textNode.parentNode.replaceChild(frag, textNode);
     }
   }
 
   // ── Restore all replacements ──────────────────────────────────
   function restoreAll() {
+    nodeQueue = [];   // 丢弃所有待处理任务
     document.querySelectorAll('.hj-span').forEach(function (el) {
       var orig = el.getAttribute(ORIGINAL_ATTR);
       if (orig) el.replaceWith(document.createTextNode(orig));
@@ -5456,21 +5509,21 @@ function convertScript(text, mode) {
       settings.scriptMode = e.target.value;
       saveSettings(settings);
       restoreAll();
-      if (isEnabled()) { walkAndReplace(document.body); updateBadge(); }
+      if (isEnabled()) { scheduleScan(document.body); }
     });
 
     panelEl.querySelector('#hj-display').addEventListener('change', function (e) {
       settings.displayMode = e.target.value;
       saveSettings(settings);
       restoreAll();
-      if (isEnabled()) { walkAndReplace(document.body); updateBadge(); }
+      if (isEnabled()) { scheduleScan(document.body); }
     });
 
     panelEl.querySelector('#hj-naver').addEventListener('change', function (e) {
       settings.showNaverLink = e.target.checked;
       saveSettings(settings);
       restoreAll();
-      if (isEnabled()) { walkAndReplace(document.body); updateBadge(); }
+      if (isEnabled()) { scheduleScan(document.body); }
     });
 
     panelEl.querySelector('#hj-badge').addEventListener('change', function (e) {
@@ -5496,8 +5549,7 @@ function convertScript(text, mode) {
       toggleBtn.classList.toggle('off', !isEnabled());
       if (isEnabled()) {
         totalCount = 0;
-        walkAndReplace(document.body);
-        updateBadge();
+        scheduleScan(document.body);
       } else {
         restoreAll();
       }
@@ -5528,7 +5580,7 @@ function convertScript(text, mode) {
     settings.enabled = !settings.enabled;
     saveSettings(settings);
     if (isEnabled()) {
-      totalCount = 0; walkAndReplace(document.body); updateBadge();
+      totalCount = 0; scheduleScan(document.body);
     } else {
       restoreAll();
     }
@@ -5541,23 +5593,31 @@ function convertScript(text, mode) {
     settings.scriptMode = modes[(idx + 1) % modes.length];
     saveSettings(settings);
     restoreAll();
-    if (isEnabled()) { walkAndReplace(document.body); updateBadge(); }
+    if (isEnabled()) { scheduleScan(document.body); }
   });
 
   // ── MutationObserver ──────────────────────────────────────────
+  // 只把新增节点丢进队列,真正的替换交给空闲时间分批做。
   function startObserver() {
     observer = new MutationObserver(function (mutations) {
       if (!isEnabled()) return;
-      var added = false;
-      mutations.forEach(function (m) {
-        m.addedNodes.forEach(function (node) {
+      for (var i = 0; i < mutations.length; i++) {
+        var nodes = mutations[i].addedNodes;
+        for (var j = 0; j < nodes.length; j++) {
+          var node = nodes[j];
           if (node.nodeType === Node.ELEMENT_NODE && !SKIP_TAGS.has(node.tagName)) {
-            walkAndReplace(node);
-            added = true;
+            collectInto(node);
+          } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
+            var pp = node.parentElement;
+            if (!SKIP_TAGS.has(pp.tagName) &&
+                !pp.hasAttribute(PROCESSED_ATTR) &&
+                HANGUL_RE.test(node.nodeValue)) {
+              nodeQueue.push(node);
+            }
           }
-        });
-      });
-      if (added) updateBadge();
+        }
+      }
+      kick();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
@@ -5568,8 +5628,7 @@ function convertScript(text, mode) {
     if (document.body) {
       createToggle();
       if (isEnabled()) {
-        walkAndReplace(document.body);
-        updateBadge();
+        scheduleScan(document.body);
       }
       startObserver();
     }

@@ -20,14 +20,23 @@
   };
 
   // ── build sorted pattern from dict ───────────────────────────
-  var SORTED_KEYS = Object.keys(HANJA_DICT).sort(function (a, b) {
-    return b.length - a.length || a.localeCompare(b);
-  });
+  // 跳过单字词条:在韩文页面里单字(구/금/만…)极高频,会造成海量误替换
+  // 和 DOM 操作,是移动端卡顿的主因。只匹配 2 字以上的词。
+  var MIN_LEN = 2;
+
+  var SORTED_KEYS = Object.keys(HANJA_DICT)
+    .filter(function (k) { return k.length >= MIN_LEN; })
+    .sort(function (a, b) {
+      return b.length - a.length || a.localeCompare(b);
+    });
 
   var PATTERN = new RegExp(
     '(' + SORTED_KEYS.map(escRe).join('|') + ')',
     'g'
   );
+
+  // 快速预筛:节点不含韩文音节时直接跳过昂贵的主正则
+  var HANGUL_RE = /[가-힣]/;
 
   function escRe(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -236,8 +245,19 @@
     return span;
   }
 
-  // ── walk text nodes and replace ───────────────────────────────
-  function walkAndReplace(root) {
+  // ── incremental, idle-time processing ─────────────────────────
+  // 不再一次性遍历整页(大页面会产生几百毫秒的长任务,移动端直接卡死)。
+  // 改为:收集候选文本节点 → 放进队列 → 利用空闲时间分批处理,每批让出主线程。
+  var nodeQueue = [];
+  var draining  = false;
+
+  var idle = window.requestIdleCallback
+    ? window.requestIdleCallback.bind(window)
+    : function (cb) { return setTimeout(function () { cb({ timeRemaining: function () { return 8; } }); }, 16); };
+
+  // 收集 root 下所有含韩文、未处理的文本节点,入队
+  function collectInto(root) {
+    if (!root || (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_NODE)) return;
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         var p = node.parentElement;
@@ -247,50 +267,74 @@
         if (p.closest('[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
         if (p.hasAttribute(PROCESSED_ATTR)) return NodeFilter.FILTER_REJECT;
         if (p.closest('.hj-span,.hj-ruby')) return NodeFilter.FILTER_REJECT;
+        if (!HANGUL_RE.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       },
     });
+    while (walker.nextNode()) nodeQueue.push(walker.currentNode);
+  }
 
-    var nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
+  function scheduleScan(root) {
+    collectInto(root);
+    kick();
+  }
 
-    for (var ni = 0; ni < nodes.length; ni++) {
-      var textNode = nodes[ni];
-      var text = textNode.nodeValue;
-      if (!PATTERN.test(text)) continue;
-      PATTERN.lastIndex = 0;
+  function kick() {
+    if (draining || nodeQueue.length === 0) return;
+    draining = true;
+    idle(drain);
+  }
 
-      // gather ±60 chars of surrounding context for disambiguation
-      var ctx = (textNode.parentElement && textNode.parentElement.textContent) || text;
+  // 分批消费队列:有空闲时间就多处理,否则至少处理一小批保证进度
+  function drain(deadline) {
+    var processed = 0;
+    while (nodeQueue.length > 0 &&
+           ((deadline && deadline.timeRemaining() > 4) || processed < 40)) {
+      processNode(nodeQueue.shift());
+      processed++;
+    }
+    draining = false;
+    if (processed > 0) updateBadge();
+    if (nodeQueue.length > 0) kick();
+  }
 
-      var frag = document.createDocumentFragment();
-      var lastIndex = 0;
-      var match;
+  function processNode(textNode) {
+    if (!textNode || !textNode.parentNode) return;   // 已脱离 DOM
+    var p = textNode.parentElement;
+    if (!p || p.hasAttribute(PROCESSED_ATTR)) return;
 
-      while ((match = PATTERN.exec(text)) !== null) {
-        var hangul = match[1];
-        var hanja = resolveHanja(hangul, ctx);
-        if (!hanja) continue;
+    var text = textNode.nodeValue;
+    PATTERN.lastIndex = 0;
 
-        if (match.index > lastIndex) {
-          frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-        }
-        frag.appendChild(makeReplacement(hangul, hanja));
-        totalCount++;
-        lastIndex = PATTERN.lastIndex;
+    var ctx = p.textContent || text;   // 上下文用于消歧
+    var frag = null;
+    var lastIndex = 0;
+    var match;
+
+    while ((match = PATTERN.exec(text)) !== null) {
+      var hangul = match[1];
+      var hanja = resolveHanja(hangul, ctx);
+      if (!hanja) continue;
+      if (!frag) frag = document.createDocumentFragment();
+      if (match.index > lastIndex) {
+        frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
       }
+      frag.appendChild(makeReplacement(hangul, hanja));
+      totalCount++;
+      lastIndex = PATTERN.lastIndex;
+    }
 
+    if (frag) {
       if (lastIndex < text.length) {
         frag.appendChild(document.createTextNode(text.slice(lastIndex)));
       }
-      if (lastIndex > 0) {
-        textNode.parentNode.replaceChild(frag, textNode);
-      }
+      textNode.parentNode.replaceChild(frag, textNode);
     }
   }
 
   // ── restore all replacements ──────────────────────────────────
   function restoreAll() {
+    nodeQueue = [];   // 丢弃所有待处理任务
     // Replace mode spans
     document.querySelectorAll('.hj-span').forEach(function (el) {
       var orig = el.getAttribute(ORIGINAL_ATTR);
@@ -320,8 +364,7 @@
       toggleBtn.classList.toggle('off', !isEnabled());
       if (isEnabled()) {
         totalCount = 0;
-        walkAndReplace(document.body);
-        updateBadge();
+        scheduleScan(document.body);
       } else {
         restoreAll();
       }
@@ -343,31 +386,28 @@
   }
 
   // ── MutationObserver for SPA pages ───────────────────────────
+  // 只把新增节点丢进队列,真正的替换交给空闲时间分批做。
+  // 这样无限滚动/动态 feed 不会每来一批内容就触发一次同步长任务。
   function startObserver() {
     observer = new MutationObserver(function (mutations) {
       if (!isEnabled()) return;
-      var added = false;
-      mutations.forEach(function (m) {
-        m.addedNodes.forEach(function (node) {
+      for (var i = 0; i < mutations.length; i++) {
+        var nodes = mutations[i].addedNodes;
+        for (var j = 0; j < nodes.length; j++) {
+          var node = nodes[j];
           if (node.nodeType === Node.ELEMENT_NODE && !SKIP_TAGS.has(node.tagName)) {
-            walkAndReplace(node);
-            added = true;
+            collectInto(node);
           } else if (node.nodeType === Node.TEXT_NODE && node.parentElement) {
-            var tmp = document.createElement('span');
-            tmp.textContent = node.nodeValue;
-            if (PATTERN.test(node.nodeValue)) {
-              PATTERN.lastIndex = 0;
-              node.parentElement.replaceChild(tmp, node);
-              walkAndReplace(tmp);
-              if (!tmp.querySelector('.hj-span,.hj-ruby')) {
-                tmp.replaceWith(document.createTextNode(tmp.textContent));
-              }
-              added = true;
+            var pp = node.parentElement;
+            if (!SKIP_TAGS.has(pp.tagName) &&
+                !pp.hasAttribute(PROCESSED_ATTR) &&
+                HANGUL_RE.test(node.nodeValue)) {
+              nodeQueue.push(node);
             }
           }
-        });
-      });
-      if (added) updateBadge();
+        }
+      }
+      kick();
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
@@ -378,14 +418,15 @@
     if (msg.type === 'GET_COUNT') {
       sendResponse({ count: totalCount });
     } else if (msg.type === 'APPLY_SETTINGS') {
-      var prev = settings.enabled;
+      // 任一影响渲染的设置变化都需要重绘(字形/显示方式/链接/名单/开关)
+      var RENDER_KEYS = ['enabled', 'scriptMode', 'displayMode', 'showNaverLink', 'whitelist', 'blacklist'];
+      var needsReapply = msg.forceReapply || RENDER_KEYS.some(function (k) {
+        return k in msg.settings && JSON.stringify(msg.settings[k]) !== JSON.stringify(settings[k]);
+      });
       settings = Object.assign(settings, msg.settings);
-      if (settings.enabled !== prev || msg.forceReapply) {
+      if (needsReapply) {
         restoreAll();
-        if (isEnabled()) {
-          walkAndReplace(document.body);
-          updateBadge();
-        }
+        if (isEnabled()) scheduleScan(document.body);
       }
       if (toggleBtn) toggleBtn.classList.toggle('off', !isEnabled());
       updateBadge();
@@ -399,8 +440,7 @@
     if (document.body) {
       createToggle();
       if (isEnabled()) {
-        walkAndReplace(document.body);
-        updateBadge();
+        scheduleScan(document.body);
       }
       startObserver();
     }
