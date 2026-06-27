@@ -267,3 +267,89 @@ footer {
 }
 
 .btn-primary:hover { background: #c62b36; }
+
+/* ── Debug section ── */
+.debug-section { border-color: #4a3a1a; }
+.debug-section h2 { color: #d9a441; }
+
+.hint.warn {
+  background: #2a2410;
+  border: 1px solid #4a3a1a;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #c9b88a;
+}
+.hint.warn strong { color: #d9a441; }
+
+.field { margin: 10px 0; }
+.field label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.field input[type="text"],
+.field input[type="password"] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  padding: 8px;
+  outline: none;
+}
+.field input:focus { border-color: var(--accent); }
+
+.dbg-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.status.inline { position: static; }
+
+.btn-secondary {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-secondary:hover { border-color: var(--accent); }
+.btn-secondary.danger:hover { border-color: var(--accent); color: var(--accent); }
+
+.dbg-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.dbg-log-head h3 { font-size: 13px; color: var(--text); }
+.dbg-log-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.dbg-summary {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-height: 320px;
+  overflow: auto;
+}
+.dbg-summary table { width: 100%; border-collapse: collapse; }
+.dbg-summary th, .dbg-summary td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.dbg-summary th { color: var(--muted); font-weight: 600; }
+.dbg-summary td.hanja { color: #d9a441; font-weight: 600; }
+.dbg-summary .count { color: var(--accent); text-align: right; }
+.dbg-summary .err { color: var(--accent); }

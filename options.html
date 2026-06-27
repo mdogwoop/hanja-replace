@@ -81,6 +81,58 @@
           </div>
         </div>
       </section>
+      <!-- Debug: AI 查漏补缺 -->
+      <section class="debug-section">
+        <h2>🔍 Debug 查漏补缺（開發者）</h2>
+        <p class="hint warn">
+          開啟後，<strong>每打開一個頁面</strong>都會在機械替換完成後，把該頁的「替換對照表 + 原始韓文片段」
+          發送到你配置的 OpenAI 相容 API（如 DeepSeek），由 AI 找出詞庫缺詞與翻譯錯誤，結果寫入本地日誌。
+          <strong>你瀏覽的網頁文字會被發送到第三方服務</strong>，請勿在含隱私/機密的頁面使用。API Key 僅存於本機（storage.local），不會同步上雲。
+        </p>
+
+        <div class="row">
+          <label class="row-label" for="dbg-enabled">啟用查漏补缺（每頁自動分析）</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" id="dbg-enabled">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="dbg-base">API Base URL</label>
+          <input type="text" id="dbg-base" placeholder="https://api.deepseek.com/v1" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="dbg-key">API Key</label>
+          <input type="password" id="dbg-key" placeholder="sk-..." autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="dbg-model">Model</label>
+          <input type="text" id="dbg-model" placeholder="deepseek-chat" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="dbg-prompt">自訂系統提示詞（留空使用內建）</label>
+          <textarea id="dbg-prompt" rows="3" placeholder="留空即可，使用內建的韓語漢字詞審查提示詞"></textarea>
+        </div>
+
+        <div class="dbg-actions">
+          <button id="dbg-test" class="btn-secondary">測試連線</button>
+          <span id="dbg-test-status" class="status inline"></span>
+        </div>
+
+        <hr class="divider">
+
+        <div class="dbg-log-head">
+          <h3>分析日誌</h3>
+          <div class="dbg-log-btns">
+            <button id="dbg-refresh" class="btn-secondary">刷新</button>
+            <button id="dbg-export-log" class="btn-secondary">匯出完整日誌</button>
+            <button id="dbg-export-dict" class="btn-secondary">匯出待補詞庫</button>
+            <button id="dbg-clear" class="btn-secondary danger">清空</button>
+          </div>
+        </div>
+        <div id="dbg-summary" class="dbg-summary">尚未載入日誌。</div>
+      </section>
     </main>
 
     <footer>

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "韓語漢字詞復原器",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "description": "将韩语网页中的汉字词（한자어）替换为韩国标准汉字（正体）显示，支持注音模式、上下文消歧",
   "permissions": ["storage"],
   "host_permissions": ["*://*/*"],

@@ -331,7 +331,9 @@
     }
     draining = false;
     if (processed > 0) updateBadge();
-    if (nodeQueue.length > 0) kick();
+    if (nodeQueue.length > 0) { kick(); return; }
+    // queue drained → maybe kick off a debug analysis for this page
+    maybeScheduleDebug();
   }
 
   function processNode(textNode) {
@@ -366,6 +368,85 @@
       }
       textNode.parentNode.replaceChild(frag, textNode);
     }
+  }
+
+  // ── Debug 查漏补缺:采集本页样本并交给 background 做 AI 分析 ──────
+  var debugEnabled = false;
+  var debugTimer = null;
+  var analyzedUrls = {};   // 每个 URL 只自动分析一次
+
+  var DBG_MAX_PAIRS = 80;
+  var DBG_MAX_BLOCKS = 30;
+  var DBG_MAX_BLOCK_LEN = 200;
+  var DBG_MAX_TOTAL = 5000;
+
+  function maybeScheduleDebug() {
+    if (!debugEnabled || !isEnabled()) return;
+    if (analyzedUrls[location.href]) return;
+    if (debugTimer) clearTimeout(debugTimer);
+    // 等页面稳定一会儿(SPA/异步内容)再采集,避免抓到半成品
+    debugTimer = setTimeout(runDebugAnalyze, 2500);
+  }
+
+  function runDebugAnalyze() {
+    if (!debugEnabled || analyzedUrls[location.href]) return;
+    var sample = collectDebugSample();
+    if (!sample.blocks.length && !sample.pairs.length) return;
+    analyzedUrls[location.href] = 1;
+    try {
+      chrome.runtime.sendMessage({ type: 'AI_ANALYZE', sample: sample }, function (res) {
+        void chrome.runtime.lastError;
+        if (!res) return;
+        if (res.ok) {
+          console.info('[漢字復原器·查漏补缺]', location.href,
+            '\n  缺词 missing:', res.missing,
+            '\n  疑误 errors:', res.errors);
+        } else {
+          console.warn('[漢字復原器·查漏补缺] 分析失败:', res.error);
+        }
+      });
+    } catch (e) { /* extension context invalidated etc. */ }
+  }
+
+  // 把元素文本中的 .hj-span 还原回原始韩文,得到接近原文的文本
+  function restoreText(el) {
+    var clone = el.cloneNode(true);
+    clone.querySelectorAll('.hj-span').forEach(function (s) {
+      var o = s.getAttribute(ORIGINAL_ATTR);
+      s.replaceWith(document.createTextNode(o != null ? o : s.textContent));
+    });
+    clone.querySelectorAll('ruby.hj-ruby').forEach(function (s) {
+      var t = s.firstChild ? s.firstChild.textContent : '';
+      s.replaceWith(document.createTextNode(t));
+    });
+    return clone.textContent || '';
+  }
+
+  function collectDebugSample() {
+    var pairs = [];
+    var seen = {};
+    var spans = document.querySelectorAll('.hj-span[' + ORIGINAL_ATTR + ']');
+    for (var i = 0; i < spans.length && pairs.length < DBG_MAX_PAIRS; i++) {
+      var h = spans[i].getAttribute(ORIGINAL_ATTR);
+      var k = spans[i].textContent;
+      if (h && !seen[h]) { seen[h] = 1; pairs.push([h, k]); }
+    }
+
+    var blocks = [];
+    var total = 0;
+    var els = document.querySelectorAll('p,li,h1,h2,h3,h4,h5,td,blockquote,dd,dt,figcaption,caption');
+    for (var j = 0; j < els.length; j++) {
+      if (blocks.length >= DBG_MAX_BLOCKS || total >= DBG_MAX_TOTAL) break;
+      var el = els[j];
+      if (el.closest('#hj-panel,#hj-btn')) continue;
+      var txt = restoreText(el).replace(/\s+/g, ' ').trim();
+      if (txt.length < 6 || !HANGUL_RE.test(txt)) continue;
+      txt = txt.slice(0, DBG_MAX_BLOCK_LEN);
+      blocks.push(txt);
+      total += txt.length;
+    }
+
+    return { url: location.href, title: document.title, pairs: pairs, blocks: blocks };
   }
 
   // ── restore all replacements ──────────────────────────────────
@@ -492,4 +573,17 @@
       }
     }
   );
+
+  // debug 开关存在 storage.local；读取并监听变化
+  chrome.storage.local.get('debugConfig', function (r) {
+    debugEnabled = !!(r.debugConfig && r.debugConfig.enabled);
+    if (debugEnabled) maybeScheduleDebug();
+  });
+  chrome.storage.onChanged.addListener(function (changes, area) {
+    if (area === 'local' && changes.debugConfig) {
+      var was = debugEnabled;
+      debugEnabled = !!(changes.debugConfig.newValue && changes.debugConfig.newValue.enabled);
+      if (debugEnabled && !was) { analyzedUrls = {}; maybeScheduleDebug(); }
+    }
+  });
 })();
