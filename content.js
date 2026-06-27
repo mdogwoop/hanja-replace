@@ -221,12 +221,14 @@
   // ── build a replaced span or ruby element ─────────────────────
   function makeReplacement(hangul, hanja) {
     if (settings.displayMode === 'ruby') {
+      // 以漢字為主體,諺文作上方小注音
       var ruby = document.createElement('ruby');
       ruby.className = 'hj-ruby';
       ruby.setAttribute(PROCESSED_ATTR, '1');
-      ruby.appendChild(document.createTextNode(hangul));
+      ruby.setAttribute(ORIGINAL_ATTR, hangul);   // 用於還原/採集
+      ruby.appendChild(document.createTextNode(hanja));   // base = 漢字
       var rt = document.createElement('rt');
-      rt.textContent = hanja;
+      rt.textContent = hangul;                            // 注音 = 諺文
       ruby.appendChild(rt);
       return ruby;
     }
@@ -416,8 +418,8 @@
       s.replaceWith(document.createTextNode(o != null ? o : s.textContent));
     });
     clone.querySelectorAll('ruby.hj-ruby').forEach(function (s) {
-      var t = s.firstChild ? s.firstChild.textContent : '';
-      s.replaceWith(document.createTextNode(t));
+      var o = s.getAttribute(ORIGINAL_ATTR);
+      s.replaceWith(document.createTextNode(o != null ? o : (s.firstChild ? s.firstChild.textContent : '')));
     });
     return clone.textContent || '';
   }
@@ -457,10 +459,11 @@
       var orig = el.getAttribute(ORIGINAL_ATTR);
       if (orig) el.replaceWith(document.createTextNode(orig));
     });
-    // Ruby mode
+    // Ruby mode — restore the original Hangul (base is now Hanja)
     document.querySelectorAll('ruby.hj-ruby').forEach(function (el) {
-      var txt = el.firstChild && el.firstChild.textContent;
-      if (txt) el.replaceWith(document.createTextNode(txt));
+      var orig = el.getAttribute(ORIGINAL_ATTR);
+      if (orig == null) orig = el.firstChild ? el.firstChild.textContent : '';
+      el.replaceWith(document.createTextNode(orig));
     });
     totalCount = 0;
     updateBadge();

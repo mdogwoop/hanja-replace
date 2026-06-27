@@ -4994,12 +4994,14 @@ var HANJA_DICT = {
   // ── Build replacement element ─────────────────────────────────
   function makeReplacement(hangul, hanja) {
     if (settings.displayMode === 'ruby') {
+      // 以漢字為主體,諺文作上方小注音
       var ruby = document.createElement('ruby');
       ruby.className = 'hj-ruby';
       ruby.setAttribute(PROCESSED_ATTR, '1');
-      ruby.appendChild(document.createTextNode(hangul));
+      ruby.setAttribute(ORIGINAL_ATTR, hangul);
+      ruby.appendChild(document.createTextNode(hanja));   // base = 漢字
       var rt = document.createElement('rt');
-      rt.textContent = hanja;
+      rt.textContent = hangul;                            // 注音 = 諺文
       ruby.appendChild(rt);
       return ruby;
     }
@@ -5146,7 +5148,8 @@ var HANJA_DICT = {
       if (orig) el.replaceWith(document.createTextNode(orig));
     });
     document.querySelectorAll('ruby.hj-ruby').forEach(function (el) {
-      var txt = el.firstChild && el.firstChild.textContent;
+      var txt = el.getAttribute(ORIGINAL_ATTR);
+      if (txt == null) txt = el.firstChild && el.firstChild.textContent;
       if (txt) el.replaceWith(document.createTextNode(txt));
     });
     totalCount = 0;
