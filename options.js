@@ -98,6 +98,7 @@ const dbg = {
   exportDict: document.getElementById('dbg-export-dict'),
   clear:      document.getElementById('dbg-clear'),
   summary:    document.getElementById('dbg-summary'),
+  pending:    document.getElementById('dbg-pending'),
 };
 
 // Load debug config into UI
@@ -237,3 +238,38 @@ function download(filename, text) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+// ── In-flight analyses indicator ─────────────────────────────────
+function renderPending(list) {
+  const n = Array.isArray(list) ? list.length : 0;
+  if (n > 0) {
+    dbg.pending.textContent = '⏳ 分析中 ' + n;
+    dbg.pending.className = 'dbg-pending busy';
+    dbg.pending.title = list.map((p) => p.url).join('\n');
+  } else {
+    dbg.pending.textContent = '空閒';
+    dbg.pending.className = 'dbg-pending idle';
+    dbg.pending.title = '';
+  }
+}
+
+function refreshPending() {
+  chrome.runtime.sendMessage({ type: 'GET_DEBUG_STATUS' }, (res) => {
+    if (chrome.runtime.lastError) { renderPending([]); return; }
+    renderPending(res && res.pending);
+  });
+}
+
+// Auto-load on open + live updates (no need to click 刷新)
+renderLog();
+refreshPending();
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'session' && changes.debugPending) {
+    const v = changes.debugPending.newValue || {};
+    renderPending(Object.keys(v).map((k) => v[k]));
+  }
+  if (area === 'local' && changes.debugLog) {
+    renderLog();   // a new result (success or failure) just landed
+  }
+});

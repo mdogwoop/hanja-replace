@@ -15,6 +15,15 @@ var DEBUG_DEFAULT = {
 var LOG_KEY = 'debugLog';
 var LOG_CAP = 200;
 
+// In-flight analyses, mirrored to storage.session so the options page can show
+// how many pages are still being analysed. Reset on every cold start.
+var pending = {};
+var pendingSeq = 0;
+function setPending() {
+  try { chrome.storage.session.set({ debugPending: pending }); } catch (e) { /* no session */ }
+}
+setPending();   // cold start → clear any stale state
+
 var DEFAULT_SYSTEM_PROMPT = [
   '你是韩语汉字词（한자어）与韩国标准汉字（正体/繁体）的专家。',
   '一个浏览器扩展会把韩文网页里的汉字词还原成对应的韩国标准汉字。下面给你：',
@@ -61,6 +70,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
+  // Options page asks for current in-flight analyses.
+  if (msg.type === 'GET_DEBUG_STATUS') {
+    sendResponse({ pending: Object.keys(pending).map((k) => pending[k]) });
+    return true;
+  }
+
   // Content script asks us to analyse a page sample.
   if (msg.type === 'AI_ANALYZE') {
     chrome.storage.local.get('debugConfig', (r) => {
@@ -69,6 +84,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: false, error: 'debug disabled or API key missing' });
         return;
       }
+      const id = ++pendingSeq;
+      pending[id] = { url: msg.sample.url, title: msg.sample.title || '', ts: Date.now() };
+      setPending();
       analyze(msg.sample, cfg)
         .then((result) => {
           writeLog({
@@ -84,6 +102,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         .catch((e) => {
           writeLog({ ts: Date.now(), url: msg.sample.url, model: cfg.model, error: String(e) });
           sendResponse({ ok: false, error: String(e) });
+        })
+        .finally(() => {
+          delete pending[id];
+          setPending();
         });
     });
     return true; // async

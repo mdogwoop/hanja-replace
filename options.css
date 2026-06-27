@@ -334,6 +334,17 @@ footer {
   margin-bottom: 10px;
 }
 .dbg-log-head h3 { font-size: 13px; color: var(--text); }
+
+.dbg-pending {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.dbg-pending.busy { background: #2a2410; color: #d9a441; }
+.dbg-pending.idle { background: #16213e; color: var(--muted); }
 .dbg-log-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 
 .dbg-summary {
