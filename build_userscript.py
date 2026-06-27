@@ -29,7 +29,7 @@ header = """\
 // @name:zh-TW   韓語漢字詞復原器
 // @name:ko      한국어 한자어 복원기
 // @namespace    https://github.com/local/hanja-replace
-// @version      2.0.1
+// @version      2.0.2
 // @description  Replaces Korean Hangul words with their original Korean-standard Hanja (正體). Supports ruby annotation, Naver dictionary links, disambiguation, domain whitelist/blacklist.
 // @author       hanja-replace contributors
 // @match        *://*/*
@@ -200,12 +200,14 @@ core_block = """
     s.id = STYLE_ID;
     s.textContent = [
       '.hj-span {',
-      '  border-bottom: 1.5px dotted #c0392b;',
       '  cursor: help;',
       '  position: relative;',
+      '}',
+      '.hj-on {',
+      '  border-bottom: 1.5px dotted #c0392b;',
       '  transition: background 0.15s;',
       '}',
-      '.hj-span:hover { background: rgba(192,57,43,0.09); }',
+      '.hj-span:hover .hj-on { background: rgba(192,57,43,0.09); }',
       '.hj-span::after {',
       '  content: attr(data-hj-orig);',
       '  position: absolute;',
@@ -290,11 +292,14 @@ core_block = """
       ruby.appendChild(rt);
       return ruby;
     }
+    // replace mode — wrapper carries the original word; only the characters
+    // that actually changed get the dotted underline (.hj-on). In mixed words
+    // (e.g. 소프트웨어工學) the kept Korean syllables stay as plain text.
     var span = document.createElement('span');
     span.className = 'hj-span';
     span.setAttribute(ORIGINAL_ATTR, hangul);
     span.setAttribute(PROCESSED_ATTR, '1');
-    span.textContent = hanja;
+    appendMarked(span, hangul, hanja);
     if (settings.showNaverLink) {
       span.classList.add('hj-link');
       span.addEventListener('click', function (e) {
@@ -306,6 +311,35 @@ core_block = """
       });
     }
     return span;
+  }
+
+  // Fill `wrap` with the hanja text, underlining (.hj-on) only the characters
+  // that differ from the original Hangul — i.e. the ones actually converted.
+  function appendMarked(wrap, hangul, hanja) {
+    if (hangul.length !== hanja.length) {
+      var whole = document.createElement('span');
+      whole.className = 'hj-on';
+      whole.textContent = hanja;
+      wrap.appendChild(whole);
+      return;
+    }
+    var i = 0;
+    while (i < hanja.length) {
+      if (hanja[i] === hangul[i]) {
+        var j = i;
+        while (j < hanja.length && hanja[j] === hangul[j]) j++;
+        wrap.appendChild(document.createTextNode(hanja.slice(i, j)));
+        i = j;
+      } else {
+        var k = i;
+        while (k < hanja.length && hanja[k] !== hangul[k]) k++;
+        var mk = document.createElement('span');
+        mk.className = 'hj-on';
+        mk.textContent = hanja.slice(i, k);
+        wrap.appendChild(mk);
+        i = k;
+      }
+    }
   }
 
   // ── Incremental, idle-time processing ─────────────────────────
