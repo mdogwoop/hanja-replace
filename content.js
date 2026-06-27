@@ -205,11 +205,11 @@
     if (d && contextText) {
       for (var i = 0; i < d.rules.length; i++) {
         if (d.rules[i].near.test(contextText)) {
-          hanja = d.rules[i].hanja;
-          break;
+          return convertScript(d.rules[i].hanja, settings.scriptMode);
         }
       }
-      if (!hanja) hanja = d.def;
+      // no context rule matched → use the curated disambiguation default
+      return convertScript(d.def, settings.scriptMode);
     }
     return convertScript(hanja, settings.scriptMode);
   }

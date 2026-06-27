@@ -593,6 +593,7 @@ with open(out_path, 'w', encoding='utf-8') as f:
     f.write(header)
     f.write(dict_block)
     f.write(conv_block)
+    f.write(settings_block)   # defines `settings`, must precede core_block
     f.write(core_block)
     f.write(footer)
 
