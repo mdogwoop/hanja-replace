@@ -81,7 +81,7 @@ const DEBUG_DEFAULT = {
   enabled: false,
   baseUrl: 'https://api.deepseek.com/v1',
   apiKey: '',
-  model: 'deepseek-chat',
+  model: 'deepseek-v4-pro',
   systemPrompt: '',
 };
 
