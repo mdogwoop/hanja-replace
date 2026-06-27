@@ -29,7 +29,7 @@ header = """\
 // @name:zh-TW   韓語漢字詞復原器
 // @name:ko      한국어 한자어 복원기
 // @namespace    https://github.com/local/hanja-replace
-// @version      2.0.0
+// @version      2.0.1
 // @description  Replaces Korean Hangul words with their original Korean-standard Hanja (正體). Supports ruby annotation, Naver dictionary links, disambiguation, domain whitelist/blacklist.
 // @author       hanja-replace contributors
 // @match        *://*/*
@@ -264,13 +264,17 @@ core_block = """
     if (!hanja) return null;
     var d = DISAMBIG[hangul];
     if (d && contextText) {
+      hanja = d.def;   // curated default unless a context rule matches
       for (var i = 0; i < d.rules.length; i++) {
         if (d.rules[i].near.test(contextText)) {
-          return d.rules[i].hanja;
+          hanja = d.rules[i].hanja;
+          break;
         }
       }
-      return d.def;
     }
+    // safety net: identical hanja means nothing to restore — skip it so we
+    // never underline an unchanged word.
+    if (hanja === hangul) return null;
     return hanja;
   }
 

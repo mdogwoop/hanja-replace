@@ -202,14 +202,17 @@
     if (!hanja) return null;
     var d = DISAMBIG[hangul];
     if (d && contextText) {
+      hanja = d.def;   // curated default unless a context rule matches
       for (var i = 0; i < d.rules.length; i++) {
         if (d.rules[i].near.test(contextText)) {
-          return d.rules[i].hanja;
+          hanja = d.rules[i].hanja;
+          break;
         }
       }
-      // no context rule matched → use the curated disambiguation default
-      return d.def;
     }
+    // safety net: if the "hanja" is identical to the original Hangul there is
+    // nothing to restore — skip it so we never underline an unchanged word.
+    if (hanja === hangul) return null;
     return hanja;
   }
 
