@@ -1,2 +1,6 @@
 node_modules/
 *.log
+
+# Build artifacts — packaged extensions are published as Release assets,
+# not committed to the repo. Regenerate with: python3 build_extensions.py
+dist/
